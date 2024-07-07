@@ -4,14 +4,14 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import os
 import re
+import torch
 
 reader = easyocr.Reader(['ro'])
 
 def split_image_by_lines(image_bytes, max_lines_per_part, buffer=5, drawbbox=True):
+    
     image = Image.open(BytesIO(image_bytes))
     results = reader.readtext(image_bytes, detail=1)
-
-    # Extract bounding boxes of detected text
     bounding_boxes = [result[0] for result in results]
 
     if drawbbox:
@@ -67,7 +67,7 @@ def split_image_by_lines(image_bytes, max_lines_per_part, buffer=5, drawbbox=Tru
 
     return parts
 
-def create_images_from_bounding_boxes(image_bytes, buffer=5, drawbbox=True):
+def create_images_from_bounding_boxes(image_bytes, buffer=5, drawbbox=False):
     image = Image.open(BytesIO(image_bytes))
     results = reader.readtext(image_bytes, detail=1)
 
@@ -118,6 +118,18 @@ def extract_text_from_image_parts(image_bytes, max_lines_per_part):
     
     return " ".join(full_text), image_parts
 
+def extract_text_from_image_parts_with_checkpoint(model, image_bytes):
+    image_parts = create_images_from_bounding_boxes(image_bytes)
+    full_text = []
+    
+    for part in image_parts:
+        part_bytes = pil_image_to_bytes(part)
+        results = model(part_bytes)
+        part_text = " ".join([result[1] for result in results])
+        full_text.append(part_text)
+    
+    return " ".join(full_text), image_parts
+
 def extract_text(image_bytes):
     results = reader.readtext(image_bytes)
     full_text = [result[1] for result in results]
@@ -149,19 +161,20 @@ def load_image_bytes(image_path):
         return image_file.read()
 
 # Example usage
-image_path = 'ocr/balcesu_benchmark/Balcescu.jpg'  # Update this with the path to your image
+image_path = 'benchmarks/balcesu_benchmark/Balcescu.jpg'  # Update this with the path to your image
 image_bytes = load_image_bytes(image_path)
 
 ######################## OCR ########################
 
-#MAX_LINES = 5
-#extracted_text, image_parts = extract_text_from_image_parts(image_bytes, max_lines_per_part=MAX_LINES)
-
-extracted_text = clean_whitespaces(extract_text(image_bytes))
+MAX_LINES = 5
+extracted_text, image_parts = extract_text_from_image_parts(image_bytes, max_lines_per_part=MAX_LINES) # extract by parts
+extracted_text = clean_whitespaces(extract_text(image_bytes)) # extract total
+ 
+#model = torch.load("easyocr/ro-wiki-singleline25-107/best_accuracy.pth")
+#model.eval()
 
 ######################## VISUALIZE ########################
 
-# # Function to visualize the image parts
 # def visualize_image_parts_lines(image_parts):
 #     plt.figure(figsize=(10, 20))
 #     for i, part in enumerate(image_parts):
@@ -170,9 +183,7 @@ extracted_text = clean_whitespaces(extract_text(image_bytes))
 #         plt.axis('off')
 #     plt.show()
 
-# #visualize_image_parts_lines(image_parts)
-
-# create_images_from_bounding_boxes
+# visualize_image_parts_lines(image_parts[:4])
 
 # import math
 # def visualize_image_parts_boxes(image_parts):
@@ -197,29 +208,43 @@ extracted_text = clean_whitespaces(extract_text(image_bytes))
 
 # visualize_image_parts_boxes(image_parts)
 
+######################## SAVE IMAGE PARTS ########################
+
+def save_image_parts(image_parts, base_path):
+    if not os.path.exists(base_path):
+        os.makedirs(base_path)
+    for i, part in enumerate(image_parts):
+        part.save(os.path.join(base_path, f'image{i}.png'))
+
+        # f.write(f'image{k}.png\t{label}\n')  # .txt
+
+# Save image parts
+save_image_parts(image_parts, 'benchmarks/balcesu_benchmark/testset/images/')
+
+
 ######################## SAVE TEXT: #######################
 
-# Function to find the next available file index
-def get_next_file_index(base_path, base_name):
-    i = 1
-    while os.path.exists(f"{base_path}/{base_name}_{i}.txt"):
-        i += 1
-    return i
+# # Function to find the next available file index
+# def get_next_file_index(base_path, base_name):
+#     i = 1
+#     while os.path.exists(f"{base_path}/{base_name}_{i}.txt"):
+#         i += 1
+#     return i
 
-# Define the base path and base name
-base_path = 'ocr/balcesu_benchmark'
-#base_name = f'easyocr_ml{MAX_LINES}'
-base_name = f'easyocr'
+# # Define the base path and base name
+# base_path = 'ocr/balcesu_benchmark'
+# #base_name = f'easyocr_ml{MAX_LINES}'
+# base_name = f'easyocr'
 
-# Get the next available file index
-next_index = get_next_file_index(base_path, base_name)
+# # Get the next available file index
+# next_index = get_next_file_index(base_path, base_name)
 
-# Construct the file name with the next available index
-file_name = f"{base_path}/{base_name}_{next_index}.txt"
+# # Construct the file name with the next available index
+# file_name = f"{base_path}/{base_name}_{next_index}.txt"
 
-# Write full text to the next available text file
-with open(file_name, 'w', encoding='utf-8') as f:
-    f.write(extracted_text)
+# # Write full text to the next available text file
+# with open(file_name, 'w', encoding='utf-8') as f:
+#     f.write(extracted_text)
 
 ################################################
 

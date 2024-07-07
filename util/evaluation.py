@@ -112,9 +112,9 @@ def process_files(directory, ground_truth_file):
     return output
 
 # Iterate over all prediction text files:
-directory = 'ocr/balcesu_benchmark'
+directory = 'benchmarks/balcesu_benchmark'
 # Have one (biased!) groundtruth as benchmark:
-ground_truth_file = 'ocr/balcesu_benchmark/gt.txt'
+ground_truth_file = 'benchmarks/balcesu_benchmark/gt.txt'
 
 # Process files and generate results
 result_string = process_files(directory, ground_truth_file)

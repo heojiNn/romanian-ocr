@@ -2,16 +2,9 @@
 
 OCR-DocGen is a script designed to generate synthetic text images from a text file for Optical Character Recognition (OCR) training. The script reads a specified number of bytes from an input text file, splits the text into smaller chunks, and creates images for these chunks. These images, along with their corresponding labels, are saved to a specified output directory.
 
-## Usage Example
+## Usage
 
-To run the script, use the following command:
-
-```sh
-python generator.py data/ro.txt data/ro-CC-100-ocr --bytes_to_read 1000000 --chunk_count 50 --chunk_length 100
-```
-Reads 10^{6} characters = 1 MB of text.\
-Creates 10^{6} / (chunk_count * chunk_length) images.
-Default: ~ 2 * 10^{3} images created. time: 10 minutes.
+### Command-Line Args:
 
 - input_path: Path to the input text file.
 - output_dir: Directory to save the output images and labels.
@@ -19,26 +12,45 @@ Default: ~ 2 * 10^{3} images created. time: 10 minutes.
 - --chunk_count: Number of text chunks per image. Default is 50.
 - --chunk_length: Maximum length of each text chunk. Default is 100.
 
+### For single-line, max-char=10, image generation, use the following command:
+
+```sh
+python data_generator/generator.py --input_path data_generator/data/input/ro-ro-wiki.txt --output_dir data_generator/data/output/ro-l25-c1-10kb-wiki-wb --bytes_to_read 10000 --chunk_count 1 --chunk_length 25
+```
+
+### For single-line, max-char=10, english image generation, use the following command:
+
+```sh
+python data_generator/generator.py --input_path data_generator/data/input/wiki-ro.txt --output_dir data_generator/data/output/ro-wiki --bytes_to_read 500000 --chunk_count 1 --chunk_length 100
+```
+
+python data_generator/generator.py --input_path data_generator/data/input/oscar_ro_train.txt --output_dir data_generator/data/output/ro-oscar --bytes_to_read 150000 --chunk_count 1 --chunk_length 100
+
+### For multi-line (25 lines), max-char=50, image generation use the following command:
+
+```sh
+python data_generator/generator.py --input_path data_generator/data/input/wiki-ro.txt --output_dir data_generator/data/output/ro-l50-c40-wiki2-ml-mid --bytes_to_read 100000 --chunk_count 40 --chunk_length 50
+```
+
+If you receive AttributeError 'FreeTypeFont', do the following in the environment:
+modify trdg.utils.py:
+    from PIL import ImageFont
+
+    def get_text_height(font: ImageFont.FreeTypeFont, text: str) -> int:
+        return font.getbbox(text)[3]
+
 Output structure (running example):
 The structure of data folder as below.
 ```
 data
 ├── labels.txt
+├── labels.csv
 └── images
-    ├── word_1.png
-    ├── word_2.png
-    ├── word_3.png
+    ├── image0.png
+    ├── image1.png
+    ├── image2.png
     └── ...
 ```
-
-```sh
-data/ro_default/image0.png
-...
-data/ro_default/image203.png # not exactly 200 images, since some characters may take more or less space.
-data/ro_default/labels.csv
-data/ro_default/labels.txt
-```
-
 
 
 ## References:
