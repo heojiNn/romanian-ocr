@@ -67,7 +67,7 @@ def split_image_by_lines(image_bytes, max_lines_per_part, buffer=5, drawbbox=Tru
 
     return parts
 
-def create_images_from_bounding_boxes(image_bytes, buffer=5, drawbbox=False):
+def create_images_from_bounding_boxes(image_bytes, buffer=5, drawbbox=True):
     image = Image.open(BytesIO(image_bytes))
     results = reader.readtext(image_bytes, detail=1)
 
@@ -81,6 +81,65 @@ def create_images_from_bounding_boxes(image_bytes, buffer=5, drawbbox=False):
     parts = []
 
     for box in bounding_boxes:
+        # Extract coordinates
+        left = min(point[0] for point in box) - buffer
+        top = min(point[1] for point in box) - buffer
+        right = max(point[0] for point in box) + buffer
+        bottom = max(point[1] for point in box) + buffer
+        
+        # Ensure coordinates are within the image dimensions
+        left = max(0, left)
+        top = max(0, top)
+        right = min(image.width, right)
+        bottom = min(image.height, bottom)
+        
+        # Crop the image
+        part = image.crop((left, top, right, bottom))
+        parts.append(part)
+    
+    return parts
+
+def create_images_from_bounding_boxes_wordbased(image_bytes, buffer=5, drawbbox=True):
+    image = Image.open(BytesIO(image_bytes))
+    results = reader.readtext(image_bytes, detail=1)
+
+    # Extract bounding boxes and detected text
+    bounding_boxes = [result[0] for result in results]
+    detected_texts = [result[1] for result in results]
+
+    # Split detected texts into individual words and map to bounding boxes
+    word_boxes = []
+    for box, text in zip(bounding_boxes, detected_texts):
+        words = text.split()
+        if len(words) > 1:
+            # If more than one word is detected in a single box, split the box
+            x_coords = [point[0] for point in box]
+            y_coords = [point[1] for point in box]
+            width = (max(x_coords) - min(x_coords)) / len(words)
+            
+            for i, word in enumerate(words):
+                left = min(x_coords) + i * width - buffer
+                top = min(y_coords) - buffer
+                right = left + width + 2 * buffer
+                bottom = max(y_coords) + buffer
+
+                # Ensure coordinates are within the image dimensions
+                left = max(0, left)
+                top = max(0, top)
+                right = min(image.width, right)
+                bottom = min(image.height, bottom)
+
+                word_boxes.append(((left, top), (right, bottom)))
+        else:
+            word_boxes.append(box)
+    
+    if drawbbox:
+        image_with_boxes = draw_bounding_boxes(image_bytes, word_boxes)
+        image_with_boxes.show()  # Display the image with bounding boxes
+
+    parts = []
+
+    for box in word_boxes:
         # Extract coordinates
         left = min(point[0] for point in box) - buffer
         top = min(point[1] for point in box) - buffer
@@ -219,7 +278,7 @@ def save_image_parts(image_parts, base_path):
         # f.write(f'image{k}.png\t{label}\n')  # .txt
 
 # Save image parts
-save_image_parts(image_parts, 'benchmarks/balcesu_benchmark/testset/images/')
+save_image_parts(image_parts, 'data_generator/data/balcesu_wb')
 
 
 ######################## SAVE TEXT: #######################

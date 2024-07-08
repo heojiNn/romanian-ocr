@@ -6,6 +6,9 @@ __pycache__/
 # Local repo:
 data_generator/requirements.txt
 data_generator/data
+data_generator/assets/fonts
+data_generator/assets/backgrounds/
+
 
 *.mp4
 *.pdf

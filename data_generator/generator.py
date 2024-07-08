@@ -9,6 +9,9 @@ import time
 import random
 from fontTools.ttLib import TTFont
 import numpy as np
+import string
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 
 def split_text(text, wordbased=False, min_length=1, max_length=100):
@@ -32,26 +35,27 @@ def split_text(text, wordbased=False, min_length=1, max_length=100):
     if not wordbased:
         i = 0
         while i < len(words):
-            if random.random() < 0.4857:
+            if random.random() < 0.4:
                 chunk_length = random.choice([1])
                 chunk = ' '.join(words[i:i+chunk_length])
                 if len(chunk) <= max_length:
                     chunks.append(chunk)
                 i += chunk_length
-            elif random.random() < 0.1714:
+            elif random.random() < 0.3:
                 chunk_length = random.choice([2])
                 chunk = ' '.join(words[i:i+chunk_length])
                 if len(chunk) <= max_length:
                     chunks.append(chunk)
                 i += chunk_length
-            elif random.random() < 0.1071:
-                chunk_length = random.choice([3])
+            elif random.random() < 0.3:
+                chunk_length = random.choice([3, 4])
                 chunk = ' '.join(words[i:i+chunk_length])
                 if len(chunk) <= max_length:
                     chunks.append(chunk)
                 i += chunk_length
             else:
-                target_length = int(np.random.beta(2, 3) * (max_length - min_length) + min_length)
+                #target_length = int(np.random.beta(2, 3) * (max_length - min_length) + min_length)
+                target_length = random.randint(min_length, max_length)
                 while i < len(words) and current_length + len(words[i]) + 1 <= target_length:
                     current_chunk.append(words[i])
                     current_length += len(words[i]) + 1
@@ -67,63 +71,6 @@ def split_text(text, wordbased=False, min_length=1, max_length=100):
             chunk = ' '.join(current_chunk)
             if min_length <= len(chunk) and len(chunk) <= max_length:
                 chunks.append(chunk)
-    else:
-        return words
-
-    return chunks
-
-def split_text_distributed(text, wordbased=False):
-    """
-    Splits text into smaller chunks based on a target word count distribution.
-    The distribution comes from easyocr detected word bounding boxes.
-    
-    Args:
-        text (str): The input text to be split.
-        wordbased (bool): Splitting based on words.
-        
-    Returns:
-        list: A list of text chunks.
-    """
-    words = text.split()
-    chunks = []
-    current_chunk = []
-    current_length = 0
-
-    # Target distribution for word counts
-    target_distribution = {
-        1: 0.4857,
-        2: 0.1714,
-        3: 0.1071,
-        4: 0.0643,
-        5: 0.0714,
-        6: 0.0429,
-        7: 0.0,
-        8: 0.0286,
-        9: 0.0071,
-        10: 0.0071,
-        11: 0.0143
-    }
-
-    # Convert the distribution to a list of weights
-    weights = [target_distribution.get(i, 0) for i in range(1, max(target_distribution.keys()) + 1)]
-
-    if not wordbased:
-        for word in words:
-            if not current_chunk:
-                # Select a target length based on the target distribution
-                target_length = np.random.choice(len(weights), p=weights) + 1
-
-            if current_length + len(word) + 1 > target_length:
-                chunks.append(' '.join(current_chunk))
-                current_chunk = [word]
-                current_length = len(word)
-                target_length = np.random.choice(len(weights), p=weights) + 1
-            else:
-                current_chunk.append(word)
-                current_length += len(word) + 1
-
-        if current_chunk:
-            chunks.append(' '.join(current_chunk))
     else:
         return words
 
@@ -148,7 +95,6 @@ def can_render_chars(font_path, characters):
 
 def get_random_font(font_dir, test_characters):
     """
-    # TODO: Get only fonts, that are case-sensitive
     Get a random font that supports the specified characters.
     
     Args:
@@ -166,9 +112,12 @@ def get_random_font(font_dir, test_characters):
             if can_render:
                 supported_fonts.append(font_path)
             else:
-                print(f"Font {font_path} is missing characters: {''.join(missing_chars)}")
+                 #print(f"Font {font_path} is missing characters: {''.join(missing_chars)}")
+                 pass
         except Exception as e:
             print(f"Error with font {font_path}: {e}")
+
+    print(f'{len(supported_fonts)}/{len(fonts)} supported fonts.')
     
     return supported_fonts
 
@@ -182,6 +131,42 @@ def log_config(config_path, params):
     """
     with open(config_path, 'a') as f:
         f.write(f"{params}\n")
+
+def define_augmentations():
+    """
+    These augmentations happen on top of the image creation augmentations.
+    """
+    augmentations = A.Compose([
+        A.OneOf([
+            A.MotionBlur(p=0.2),
+            A.MedianBlur(blur_limit=3, p=0.1),
+            A.Blur(blur_limit=3, p=0.1),
+            A.GaussianBlur(blur_limit=3, p=0.1),
+        ], p=0.15),
+        #A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=20, p=0.3),
+        A.OneOf([
+            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.4),
+            A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.4),
+            A.RGBShift(r_shift_limit=20, g_shift_limit=20, b_shift_limit=20, p=0.4),
+        ], p=0.5),
+        A.OneOf([
+            A.RandomShadow(p=0.2),
+            A.RandomRain(p=0.1),
+            A.RandomSnow(p=0.1),
+            A.RandomFog(p=0.1),
+        ], p=0.3),
+        A.OneOf([
+            A.CLAHE(p=0.2),
+            A.ToGray(p=0.2),
+            A.ChannelShuffle(p=0.2),
+        ], p=0.3),
+        A.Perspective(scale=(0.05, 0.1), keep_size=True, p=0.3),
+        A.PiecewiseAffine(scale=(0.02, 0.05), p=0.3),
+        A.GaussNoise(var_limit=(10.0, 50.0), p=0.2),
+        A.GridDistortion(num_steps=5, distort_limit=0.3, p=0.2),
+        ToTensorV2()
+    ])
+    return augmentations
 
 def generate_image_pairs(input_path, output_dir, bytes_to_read, chunk_count=50,
                          min_chunk_length=1, max_chunk_length=100, create_csv=False,
@@ -242,9 +227,10 @@ def generate_image_pairs(input_path, output_dir, bytes_to_read, chunk_count=50,
     except Exception as e:
         print(f"An error occurred: {e}")
 
-    font_dir = 'data_generator/assets/fonts'
-    romanian_characters = 'ăâîșțĂÂÎȘȚ'
-    supported_fonts  = get_random_font(font_dir, romanian_characters)
+    # select all fonts, and chose random for each image
+    font_dir = 'data_generator/assets/fonts/combined'
+    all_chars = string.printable[:-6] + "ăâîșțĂÂÎȘȚ" + " "
+    supported_fonts  = get_random_font(font_dir, all_chars)
     if not supported_fonts:
         print("No fonts support the required Romanian characters.")
         return
@@ -252,6 +238,12 @@ def generate_image_pairs(input_path, output_dir, bytes_to_read, chunk_count=50,
     with open(labels_txt_path, "a", encoding='utf-8') as f:
         for i, chunk in enumerate(tqdm(text_chunks, desc="Generating chunks..")):
             font_path = random.choice(supported_fonts)
+            background_type = random.choices([0, 1, 2, 3], weights=[0.1, 0.1, 0.1, 0.7], k=1)[0]
+            grey_shade = int(np.random.beta(2, 3) * 200)
+            text_color = f"#{grey_shade:02x}{grey_shade:02x}{grey_shade:02x}"
+            margin_size = random.randint(10, 20) # center a bit
+            margins = (margin_size, margin_size, margin_size, margin_size)
+
             generator = GeneratorFromStrings( # play around with data augmentation.
                 [chunk],
                 # count=-1,
@@ -262,35 +254,41 @@ def generate_image_pairs(input_path, output_dir, bytes_to_read, chunk_count=50,
                 random_skew=True,
                 blur=random.randint(0, 3),  # [0, 1, 2, 3] # Standard deviation of the Gaussian kernel. Either a sequence of two numbers for x and y, or a single number for both.
                 random_blur=True,
-                background_type=random.randint(0, 3),  # [0, 1, 2]
+                background_type=background_type,  # [0, 1, 2]
                 distorsion_type=random.randint(0, 3), # [0, 1, 2, else]
                 distorsion_orientation=random.randint(0, 2), # [0, 1, 2]
                 # is_handwritten=False,
                 # width=-1,
                 # alignment=1,
-                text_color="#282828",
+                text_color=text_color,
                 orientation=0, # 0 = horizontal text, 1 = vertical text
                 space_width=random.uniform(0.5, 1.5),
                 character_spacing=random.randint(0, 5),
-                margins=(random.randint(5, 15), random.randint(5, 15), random.randint(5, 15), random.randint(5, 15)),
-                fit=random.choice([True, False]),
+                margins=margins,
+                fit=True, #random.choice([True, False])
                 output_mask=False,
                 word_split=False,
-                # image_dir=os.path.join(
-                #     "..", os.path.split(os.path.realpath(__file__))[0], "images"
-                # ),
+                #image_dir=os.path.join("..", os.path.split(os.path.realpath(__file__))[0], "images"),,
                 stroke_width=random.randint(0, 2), #0
                 stroke_fill="#282828",
                 image_mode="RGB",
                 output_bboxes=0,
                 rtl=False,
+                #width=random.randint(512, 1024),  # Increased image width
             )
         
             for img, lbl in generator: 
                 if img is not None:  # Ensure img is not None before processing
                     pil_img = ImageEnhance.Sharpness(img).enhance(random.uniform(1.2, 1.8))  # Adjusted sharpness enhancement
                     pil_img = ImageEnhance.Contrast(pil_img).enhance(random.uniform(1.2, 1.8))  # Adjusted contrast enhancement
-                    images.append(pil_img)
+
+                    # Apply Further augmentations
+                    img_array = np.array(pil_img)
+                    augmented = define_augmentations()(image=img_array)
+                    augmented_img = augmented['image']
+                    augmented_pil_img = Image.fromarray(augmented_img.permute(1, 2, 0).cpu().numpy().astype(np.uint8))
+
+                    images.append(augmented_pil_img)
                     page_string += lbl + ' '
                 break
 

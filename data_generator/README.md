@@ -1,5 +1,13 @@
 # OCR-DocGen
 
+## References:
+
+### Image generation:
+- https://github.com/Belval/TextRecognitionDataGenerator
+### Training / finetuning:
+Output format designed for EasyOCR, as explained here:
+- https://github.com/clovaai/deep-text-recognition-benchmark
+
 OCR-DocGen is a script designed to generate synthetic text images from a text file for Optical Character Recognition (OCR) training. The script reads a specified number of bytes from an input text file, splits the text into smaller chunks, and creates images for these chunks. These images, along with their corresponding labels, are saved to a specified output directory.
 
 ## Usage
@@ -24,7 +32,15 @@ python data_generator/generator.py --input_path data_generator/data/input/ro-ro-
 python data_generator/generator.py --input_path data_generator/data/input/wiki-ro.txt --output_dir data_generator/data/output/ro-wiki --bytes_to_read 500000 --chunk_count 1 --chunk_length 100
 ```
 
-python data_generator/generator.py --input_path data_generator/data/input/oscar_ro_train.txt --output_dir data_generator/data/output/ro-oscar --bytes_to_read 150000 --chunk_count 1 --chunk_length 100
+### augment_v2 generation::
+
+```sh
+python data_generator/generator.py --input_path data_generator/data/input/oscar_ro_train.txt --output_dir data_generator/data/output/augment_v1/ro-oscar --bytes_to_read 150000 --chunk_count 1 --chunk_length 100
+
+# 45214 images:
+python data_generator/generator.py --input_path data_generator/data/input/oscar_ro_train.txt --output_dir data_generator/data/output/augment_v2/ro-oscarv2.7_train --bytes_to_read 1000000 --chunk_count 1 --chunk_length 100
+```
+
 
 ### For multi-line (25 lines), max-char=50, image generation use the following command:
 
@@ -53,14 +69,5 @@ data
 ```
 
 
-## References:
 
-### Image generation:
-- https://github.com/Belval/TextRecognitionDataGenerator
-### Training / finetuning:
-Output format designed for EasyOCR, as explained here:
-- https://github.com/clovaai/deep-text-recognition-benchmark
 
-Alternative labeling schemes possible by using: --create_csv and adapting code for respective columns.
-### General:
-- https://www.freecodecamp.org/news/how-to-fine-tune-easyocr-with-a-synthetic-dataset/
